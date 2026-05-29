@@ -184,6 +184,13 @@
     .btn.primary { background: var(--red); color: var(--white); border-color: var(--red); }
     .btn.primary:hover, .btn.primary:focus { background: var(--white); color: var(--black); border-color: var(--white); }
     .btn.ghost { color: var(--muted); border-color: #555; }
+    .auth-panel { border: 1px solid #555; background: #050505; padding: 12px; margin-bottom: 16px; display: grid; gap: 10px; }
+    .auth-line { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .auth-line b { color: var(--fg); }
+    .auth-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .auth-form input { min-height: 46px; }
+    .auth-form .btn { min-height: 46px; }
+    @media (max-width: 520px) { .auth-form { grid-template-columns: 1fr; } }
 
     .progress-wrap { margin-top: 14px; }
     .progress-meta { display:flex; justify-content:space-between; color:var(--muted); font-size:12px; margin-bottom:8px; }
@@ -278,6 +285,18 @@
       <div class="panel">
         <div class="panel-title"><span>&gt; challenge console</span><span id="saveState">local save</span></div>
 
+        <section class="auth-panel" aria-label="Account sync">
+          <div class="auth-line" id="authStatus">&gt; guest mode // saved on this device</div>
+          <div class="auth-form" id="authForm">
+            <input id="emailInput" type="email" autocomplete="email" placeholder="email for magic link" />
+            <button class="btn primary" id="magicLinkBtn">Send magic link</button>
+          </div>
+          <div class="btnrow hidden" id="signedInActions">
+            <button class="btn" id="syncNowBtn">Sync now</button>
+            <button class="btn ghost" id="signOutBtn">Sign out</button>
+          </div>
+        </section>
+
         <section id="setupView" class="setup">
           <label for="fearInput">Main fear to tackle for 7 days</label>
           <input id="fearInput" maxlength="120" placeholder="Example: posting without overthinking" />
@@ -299,7 +318,7 @@
             <button class="btn" id="finalBtn">Generate report</button>
             <button class="btn ghost" id="resetBtn">Reset</button>
           </div>
-          <p class="footer-note">Everything saves in this browser only. No account. No cloud. Just you versus the barrier.</p>
+          <p class="footer-note">Guest mode saves on this device. Sign in with magic link to sync across devices.</p>
         </section>
 
         <section id="reportView" class="report hidden">
@@ -328,8 +347,14 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const LS_KEY = 'break_glass_fear_challenge_v1';
+    const SUPABASE_URL = 'https://cvjuqwmdlrwirxztjgwo.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_tGVY66Uqb-anzUXucIdiIg_t37SXrzg';
+    const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let authUser = null;
+    let cloudSyncOk = false;
     const prompts = [
       'DAY 1 // See it: What does this fear actually protect you from?',
       'DAY 2 // Touch it: Do one small thing that brings the fear into the room.',
@@ -455,16 +480,26 @@ String.raw`      \  |  /
       fearLine: $('fearLine'), days: $('days'), entryLabel: $('entryLabel'), dayPrompt: $('dayPrompt'), entryText: $('entryText'),
       saveBtn: $('saveBtn'), finalBtn: $('finalBtn'), resetBtn: $('resetBtn'), mDays: $('mDays'), mWords: $('mWords'), mStreak: $('mStreak'),
       reportText: $('reportText'), freedomBtn: $('freedomBtn'), backBtn: $('backBtn'), freedomOverlay: $('freedomOverlay'),
-      freedomAscii: $('freedomAscii'), closeFreedom: $('closeFreedom'), shards: $('shards')
+      freedomAscii: $('freedomAscii'), closeFreedom: $('closeFreedom'), shards: $('shards'),
+      authStatus: $('authStatus'), authForm: $('authForm'), emailInput: $('emailInput'), magicLinkBtn: $('magicLinkBtn'),
+      signedInActions: $('signedInActions'), syncNowBtn: $('syncNowBtn'), signOutBtn: $('signOutBtn')
     };
 
-    function loadState() {
-      try { return JSON.parse(localStorage.getItem(LS_KEY)) || { fear:'', entries: Array(7).fill(''), startedAt: null }; }
-      catch { return { fear:'', entries: Array(7).fill(''), startedAt: null }; }
+    function emptyState() { return { fear:'', entries: Array(7).fill(''), startedAt: null, challengeId: null }; }
+    function normalizeState(raw) {
+      return { ...emptyState(), ...(raw || {}), entries: Array.from({length: 7}, (_, i) => raw?.entries?.[i] || '') };
     }
-    function saveState() {
+    function loadState() {
+      try { return normalizeState(JSON.parse(localStorage.getItem(LS_KEY))); }
+      catch { return emptyState(); }
+    }
+    function saveLocalOnly() {
       localStorage.setItem(LS_KEY, JSON.stringify(state));
-      els.saveState.textContent = 'saved ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      els.saveState.textContent = (authUser ? 'local + cloud' : 'local save') + ' ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+    async function saveState() {
+      saveLocalOnly();
+      if (authUser && state.fear) await syncStateNow();
     }
     function completedCount() { return state.entries.filter(e => e && e.trim().length > 0).length; }
     function firstIncompleteDay() { const i = state.entries.findIndex(e => !e || !e.trim()); return i === -1 ? 6 : i; }
@@ -474,6 +509,152 @@ String.raw`      \  |  /
       let best = 0, run = 0;
       state.entries.forEach(e => { if (e && e.trim()) { run++; best = Math.max(best, run); } else run = 0; });
       return best;
+    }
+
+    function setAuthStatus(message, isError = false) {
+      els.authStatus.innerHTML = '&gt; ' + escapeHtml(message).replace(/\n/g, '<br>&gt; ');
+      els.authStatus.style.color = isError ? 'var(--red)' : 'var(--muted)';
+    }
+
+    function renderAuth() {
+      if (!supabaseClient) {
+        setAuthStatus('Supabase failed to load // guest mode only', true);
+        return;
+      }
+      if (authUser) {
+        els.authForm.classList.add('hidden');
+        els.signedInActions.classList.remove('hidden');
+        setAuthStatus(`${authUser.email || 'signed in'} // ${cloudSyncOk ? 'cloud sync active' : 'cloud setup pending'}`);
+      } else {
+        els.authForm.classList.remove('hidden');
+        els.signedInActions.classList.add('hidden');
+        setAuthStatus('guest mode // saved on this device // add email to sync');
+      }
+    }
+
+    async function initAuth() {
+      if (!supabaseClient) { renderAuth(); return; }
+      const { data } = await supabaseClient.auth.getSession();
+      authUser = data.session?.user || null;
+      if (authUser) await loadOrSyncCloudState();
+      renderAuth(); render();
+      supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+        authUser = session?.user || null;
+        if (authUser) await loadOrSyncCloudState();
+        renderAuth(); render();
+      });
+    }
+
+    async function sendMagicLink() {
+      const email = els.emailInput.value.trim();
+      if (!email) { els.emailInput.focus(); return; }
+      els.magicLinkBtn.disabled = true;
+      setAuthStatus('sending magic link...');
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin + window.location.pathname }
+      });
+      els.magicLinkBtn.disabled = false;
+      if (error) setAuthStatus('magic link failed // ' + error.message, true);
+      else setAuthStatus('magic link sent // check your email');
+    }
+
+    async function signOut() {
+      await supabaseClient.auth.signOut();
+      authUser = null; cloudSyncOk = false;
+      renderAuth(); render();
+    }
+
+    async function loadOrSyncCloudState() {
+      if (!authUser || !supabaseClient) return;
+      const localHasChallenge = Boolean(state.fear);
+      try {
+        if (localHasChallenge && !state.challengeId) {
+          await syncStateNow();
+          return;
+        }
+        const { data: challenges, error: challengeError } = await supabaseClient
+          .from('challenges')
+          .select('id,fear_text,started_at,completed_at,created_at')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (challengeError) throw challengeError;
+        const challenge = challenges?.[0];
+        if (!challenge) { cloudSyncOk = true; renderAuth(); return; }
+        const { data: checkins, error: checkinError } = await supabaseClient
+          .from('checkins')
+          .select('day_number,entry_text')
+          .eq('challenge_id', challenge.id)
+          .order('day_number', { ascending: true });
+        if (checkinError) throw checkinError;
+        const entries = Array(7).fill('');
+        (checkins || []).forEach(row => { entries[row.day_number - 1] = row.entry_text || ''; });
+        state = normalizeState({ fear: challenge.fear_text, entries, startedAt: challenge.started_at, challengeId: challenge.id });
+        currentDay = Math.min(Math.max(firstIncompleteDay(), 0), 6);
+        cloudSyncOk = true;
+        saveLocalOnly();
+      } catch (error) {
+        cloudSyncOk = false;
+        setAuthStatus('signed in, but cloud tables are not ready // run supabase/schema.sql', true);
+        console.warn('Cloud sync unavailable:', error.message);
+      }
+    }
+
+    async function syncStateNow() {
+      if (!authUser || !supabaseClient || !state.fear) return;
+      try {
+        let challengeId = state.challengeId;
+        if (!challengeId) {
+          const { data, error } = await supabaseClient
+            .from('challenges')
+            .insert({ user_id: authUser.id, fear_text: state.fear, started_at: state.startedAt || new Date().toISOString() })
+            .select('id')
+            .single();
+          if (error) throw error;
+          challengeId = data.id;
+          state.challengeId = challengeId;
+          saveLocalOnly();
+        } else {
+          const { error } = await supabaseClient
+            .from('challenges')
+            .update({ fear_text: state.fear, completed_at: completedCount() === 7 ? new Date().toISOString() : null })
+            .eq('id', challengeId);
+          if (error) throw error;
+        }
+        const rows = state.entries.map((entry, index) => ({
+          challenge_id: challengeId,
+          user_id: authUser.id,
+          day_number: index + 1,
+          entry_text: entry || ''
+        }));
+        const { error: upsertError } = await supabaseClient
+          .from('checkins')
+          .upsert(rows, { onConflict: 'challenge_id,day_number' });
+        if (upsertError) throw upsertError;
+        cloudSyncOk = true;
+        renderAuth();
+      } catch (error) {
+        cloudSyncOk = false;
+        setAuthStatus('cloud sync failed // ' + error.message, true);
+        console.warn('Cloud sync failed:', error.message);
+      }
+    }
+
+    async function syncReport(summaryText, metrics) {
+      if (!authUser || !supabaseClient || !state.challengeId) return;
+      try {
+        const { error } = await supabaseClient.from('reports').upsert({
+          challenge_id: state.challengeId,
+          user_id: authUser.id,
+          summary_text: summaryText,
+          days_completed: metrics.done,
+          word_count: metrics.words,
+          longest_streak: metrics.streak
+        }, { onConflict: 'challenge_id' });
+        if (error) throw error;
+      } catch (error) {
+        console.warn('Report sync failed:', error.message);
+      }
     }
 
     function render() {
@@ -541,6 +722,7 @@ String.raw`      \  |  /
         <p><b>Pattern detected:</b> ${actionHits.length ? 'Your entries contain action language: ' + actionHits.join(', ') + '.' : 'You are still describing the barrier more than the action. Next checkpoint: write the exact move you made.'}</p>
         <p><b>Emotional signal:</b> ${feelingHits.length ? 'You named real body/emotion signals: ' + feelingHits.join(', ') + '. That means you are watching the fear instead of being fully owned by it.' : 'Name the body sensation more directly next time. Fear gets smaller when it becomes specific.'}</p>
         <p><b>Freedom note:</b> The win is not becoming fearless. The win is building evidence that fear can ride in the passenger seat while you keep your hands on the wheel.</p>`;
+      syncReport(els.reportText.textContent.trim(), { done, words, streak: longestStreak() });
       els.trackerView.classList.add('hidden');
       els.reportView.classList.remove('hidden');
     }
@@ -578,24 +760,24 @@ String.raw`      \  |  /
       }
     }
 
-    els.startBtn.addEventListener('click', () => {
+    els.startBtn.addEventListener('click', async () => {
       const fear = els.fearInput.value.trim();
       if (!fear) { els.fearInput.focus(); els.fearInput.placeholder = 'Name the fear first.'; return; }
-      state = { fear, entries: Array(7).fill(''), startedAt: new Date().toISOString() };
+      state = { fear, entries: Array(7).fill(''), startedAt: new Date().toISOString(), challengeId: null };
       currentDay = 0;
-      saveState(); render();
+      await saveState(); render();
     });
-    els.demoBtn.addEventListener('click', () => {
+    els.demoBtn.addEventListener('click', async () => {
       state = { fear: 'being seen before I feel ready', startedAt: new Date().toISOString(), entries: [
         'I posted the first story even though my chest got tight. Fear said people would cringe. I did it anyway.',
         'I told one friend about the challenge. I felt awkward and alive at the same time.', '', '', '', '', ''
-      ]};
-      currentDay = 2; saveState(); render();
+      ], challengeId: null};
+      currentDay = 2; await saveState(); render();
     });
-    els.saveBtn.addEventListener('click', () => {
+    els.saveBtn.addEventListener('click', async () => {
       state.entries[currentDay] = els.entryText.value.trim();
       if (state.entries[currentDay] && currentDay < 6) currentDay = Math.min(firstIncompleteDay(), currentDay + 1);
-      saveState(); render();
+      await saveState(); render();
     });
     els.finalBtn.addEventListener('click', generateReport);
     els.backBtn.addEventListener('click', () => { els.reportView.classList.add('hidden'); els.trackerView.classList.remove('hidden'); });
@@ -604,12 +786,17 @@ String.raw`      \  |  /
     els.resetBtn.addEventListener('click', () => {
       if (!confirm('Reset this 7 day challenge on this browser?')) return;
       localStorage.removeItem(LS_KEY);
-      state = { fear:'', entries:Array(7).fill(''), startedAt:null };
+      state = emptyState();
       currentDay = 0; render();
     });
-    els.entryText.addEventListener('input', () => { state.entries[currentDay] = els.entryText.value; saveState(); renderDays(); });
+    els.entryText.addEventListener('input', () => { state.entries[currentDay] = els.entryText.value; saveLocalOnly(); renderDays(); });
+    els.entryText.addEventListener('blur', () => saveState());
+    els.magicLinkBtn.addEventListener('click', sendMagicLink);
+    els.signOutBtn.addEventListener('click', signOut);
+    els.syncNowBtn.addEventListener('click', syncStateNow);
 
     render();
+    initAuth();
   </script>
 </body>
 </html>
