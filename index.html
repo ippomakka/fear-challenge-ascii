@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BREAK THE GLASS // 7 Day Fear Challenge</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --fg: #f7f7f2;
+      --muted: #9b9b92;
+      --red: #ff1b1c;
+      --red-dark: #b2141b;
+      --line: #f7f7f2;
+      --panel: #0d0d0d;
+      --panel-2: #151515;
+      --black: #000;
+      --white: #fff;
+      --danger-soft: rgba(255, 27, 28, .14);
+      --danger-hard: rgba(255, 27, 28, .42);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 4px),
+        radial-gradient(circle at 15% 0%, rgba(255, 27, 28, .16), transparent 34rem),
+        linear-gradient(180deg, #0a0a0a 0%, var(--bg) 100%);
+      color: var(--fg);
+      font-family: var(--mono);
+      letter-spacing: -.02em;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(rgba(255,255,255,.03) 50%, rgba(0,0,0,.09) 50%);
+      background-size: 100% 4px;
+      mix-blend-mode: screen;
+      opacity: .34;
+      z-index: 20;
+    }
+
+    a, button, textarea, input { font: inherit; }
+    button, input, textarea { border-radius: 0; }
+    button { cursor: pointer; }
+    .wrap { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 24px 0 88px; }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 14px;
+      margin-bottom: 22px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      color: var(--red);
+      border: 2px solid var(--red);
+      padding: 6px 8px;
+      font-weight: 900;
+      text-shadow: 0 0 14px rgba(255,27,28,.65);
+    }
+    .brand h1 { font-size: clamp(18px, 3vw, 38px); margin: 0; text-transform: uppercase; line-height: .95; }
+    .brand small { color: var(--muted); display: block; margin-top: 6px; font-size: 12px; }
+    .status-chip { border: 1px solid var(--red); color: var(--red); padding: 10px 12px; white-space: nowrap; text-transform: uppercase; background: var(--danger-soft); }
+
+    .grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 20px; align-items: start; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } .status-chip { display:none; } }
+
+    .panel {
+      position: relative;
+      border: 2px solid var(--line);
+      background: rgba(8,8,8,.92);
+      padding: 18px;
+    }
+    .panel::before, .panel::after {
+      position: absolute;
+      color: var(--red);
+      font-weight: 900;
+      background: var(--bg);
+      padding: 0 4px;
+    }
+    .panel::before { content: "+"; top: -11px; left: 12px; }
+    .panel::after { content: "+"; bottom: -11px; right: 12px; }
+    .panel-title {
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      margin: 0 0 14px;
+      color: var(--red);
+      text-transform: uppercase;
+      font-size: 13px;
+      letter-spacing: .12em;
+    }
+    .panel-title span:last-child { color: var(--muted); letter-spacing: 0; }
+
+    .hero {
+      min-height: 560px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+    }
+    .hero-copy h2 {
+      margin: 0;
+      font-size: clamp(38px, 8vw, 92px);
+      line-height: .82;
+      text-transform: uppercase;
+      letter-spacing: -.08em;
+    }
+    .hero-copy h2 b { color: var(--red); text-shadow: 0 0 22px rgba(255,27,28,.55); }
+    .hero-copy p { color: var(--muted); max-width: 68ch; line-height: 1.55; margin: 18px 0 0; }
+
+    .ascii-stage {
+      border: 1px solid var(--red-dark);
+      background: linear-gradient(180deg, rgba(255,27,28,.08), rgba(255,255,255,.015));
+      display: grid;
+      place-items: center;
+      min-height: 280px;
+      overflow: hidden;
+      position: relative;
+    }
+    .ascii-stage::before {
+      content: "FEAR BARRIER // PRESSURE TEST // FEAR BARRIER // PRESSURE TEST";
+      position: absolute;
+      top: 10px;
+      left: 0;
+      color: rgba(255,27,28,.32);
+      white-space: nowrap;
+      animation: ticker 18s linear infinite;
+      font-size: 12px;
+    }
+    @keyframes ticker { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+    pre.ascii {
+      margin: 0;
+      color: var(--fg);
+      line-height: 1.04;
+      font-size: clamp(10px, 1.45vw, 16px);
+      text-align: center;
+      text-shadow: 0 0 10px rgba(255,255,255,.12), 0 0 18px rgba(255,27,28,.22);
+      white-space: pre;
+      transform: translateZ(0);
+    }
+    pre.ascii.final { color: var(--red); animation: breakPulse .95s steps(2,end) infinite; }
+    @keyframes breakPulse {
+      0%,100% { transform: translate(0,0) scale(1); filter: none; }
+      20% { transform: translate(-2px,1px) skewX(-2deg); filter: contrast(1.35); }
+      55% { transform: translate(2px,-1px) skewX(2deg); color: var(--white); }
+    }
+
+    .setup { display: grid; gap: 14px; }
+    label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+    input, textarea {
+      width: 100%;
+      min-height: 50px;
+      background: #030303;
+      color: var(--fg);
+      border: 2px solid var(--line);
+      padding: 14px;
+      outline: none;
+      font-size: 16px;
+    }
+    textarea { min-height: 140px; resize: vertical; line-height: 1.45; }
+    input:focus, textarea:focus { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
+    .btnrow { display:flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      min-height: 48px;
+      border: 2px solid var(--line);
+      color: var(--fg);
+      background: transparent;
+      padding: 12px 14px;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+    .btn:hover, .btn:focus { border-color: var(--red); color: var(--red); outline: none; }
+    .btn.primary { background: var(--red); color: var(--white); border-color: var(--red); }
+    .btn.primary:hover, .btn.primary:focus { background: var(--white); color: var(--black); border-color: var(--white); }
+    .btn.ghost { color: var(--muted); border-color: #555; }
+
+    .progress-wrap { margin-top: 14px; }
+    .progress-meta { display:flex; justify-content:space-between; color:var(--muted); font-size:12px; margin-bottom:8px; }
+    .progress-bar { border: 2px solid var(--line); height: 34px; position: relative; overflow:hidden; background:#020202; }
+    .progress-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#555; letter-spacing:.18em; font-size:10px; }
+    .progress-fill { position:absolute; inset:0 auto 0 0; width:0%; background:var(--red); transition: width .45s ease; display:flex; align-items:center; justify-content:flex-end; color:#fff; font-size:11px; font-weight:900; white-space:nowrap; overflow:hidden; padding-right:8px; }
+
+    .days { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin: 16px 0; }
+    .daytab {
+      min-height: 58px;
+      border: 1px solid #555;
+      background: #050505;
+      color: var(--muted);
+      padding: 8px 4px;
+      text-align: center;
+    }
+    .daytab strong { display:block; color:inherit; font-size: 16px; }
+    .daytab.done { color: var(--white); border-color: var(--red); background: var(--danger-soft); }
+    .daytab.active { color: var(--black); border-color: var(--white); background: var(--white); }
+    @media (max-width: 520px) { .days { grid-template-columns: repeat(4, 1fr); } }
+
+    .prompt {
+      border-left: 4px solid var(--red);
+      padding: 12px 0 12px 14px;
+      color: var(--fg);
+      line-height: 1.45;
+      margin: 12px 0;
+    }
+    .fearline { color: var(--red); word-break: break-word; }
+    .hidden { display:none !important; }
+    .report { display:grid; gap: 12px; }
+    .metric-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media (max-width: 640px) { .metric-grid { grid-template-columns: 1fr; } }
+    .metric { border: 1px solid #555; padding: 12px; background:#050505; }
+    .metric b { display:block; color:var(--red); font-size: 26px; }
+    .metric span { color:var(--muted); font-size: 12px; text-transform: uppercase; }
+    .report-text { border:1px solid var(--red-dark); padding:14px; line-height:1.55; background:rgba(255,27,28,.06); }
+
+    .freedom-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: rgba(0,0,0,.94);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+    .freedom-box { width:min(980px,100%); text-align:center; }
+    .freedom-box pre { color: var(--red); font-size: clamp(8px, 1.4vw, 15px); line-height: 1; text-shadow: 0 0 26px rgba(255,27,28,.8); }
+    .freedom-word { font-size: clamp(44px, 10vw, 130px); line-height:.8; color:var(--white); margin: 16px 0; text-transform:uppercase; letter-spacing:-.1em; }
+    .shards { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+    .shard { position:absolute; color:var(--red); animation: fly 1300ms ease-out forwards; font-weight:900; }
+    @keyframes fly { to { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); opacity:0; } }
+
+    .footer-note { color: var(--muted); font-size:12px; margin-top: 16px; line-height:1.5; }
+    .glitch { animation: glitch 3.5s infinite; }
+    @keyframes glitch { 0%, 92%,100% { transform: translate(0); } 93% { transform: translate(2px,-1px); } 94% { transform: translate(-2px,1px); } 95% { transform: translate(1px,0); } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">[//]</div>
+        <div>
+          <h1>Break The Glass</h1>
+          <small>7 day fear challenge tracker // red black white protocol</small>
+        </div>
+      </div>
+      <div class="status-chip" id="statusChip">DAY 0 / SYSTEM LOCKED</div>
+    </header>
+
+    <section class="grid">
+      <div class="panel hero">
+        <div class="panel-title"><span>&gt; barrier visual</span><span id="stageLabel">unbroken</span></div>
+        <div class="hero-copy">
+          <h2 class="glitch">Your fear is <b>the door.</b></h2>
+          <p>Write the fear. Face it for seven days. Check in honestly. Watch the glass weaken until the barrier becomes proof that you moved.</p>
+        </div>
+        <div class="ascii-stage" aria-live="polite">
+          <pre class="ascii" id="asciiArt"></pre>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-meta"><span id="progressText">0/7 CHECKPOINTS</span><span id="percentText">0%</span></div>
+          <div class="progress-bar" aria-label="challenge progress">
+            <div class="progress-empty">░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░</div>
+            <div class="progress-fill" id="progressFill">████</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span>&gt; challenge console</span><span id="saveState">local save</span></div>
+
+        <section id="setupView" class="setup">
+          <label for="fearInput">Main fear to tackle for 7 days</label>
+          <input id="fearInput" maxlength="120" placeholder="Example: posting without overthinking" />
+          <div class="prompt">&gt; Name it plainly. No poetry needed. The tracker works because you return every day and tell the truth.</div>
+          <div class="btnrow">
+            <button class="btn primary" id="startBtn">Start challenge</button>
+            <button class="btn ghost" id="demoBtn">Load demo</button>
+          </div>
+        </section>
+
+        <section id="trackerView" class="hidden">
+          <div class="prompt">FEAR TARGET: <span class="fearline" id="fearLine"></span></div>
+          <div class="days" id="days"></div>
+          <label id="entryLabel" for="entryText">Day 1 field report</label>
+          <div class="prompt" id="dayPrompt"></div>
+          <textarea id="entryText" placeholder="What did you do? What did your body feel? What did fear say? What did you do anyway?"></textarea>
+          <div class="btnrow" style="margin-top:12px">
+            <button class="btn primary" id="saveBtn">Save checkpoint</button>
+            <button class="btn" id="finalBtn">Generate report</button>
+            <button class="btn ghost" id="resetBtn">Reset</button>
+          </div>
+          <p class="footer-note">Everything saves in this browser only. No account. No cloud. Just you versus the barrier.</p>
+        </section>
+
+        <section id="reportView" class="report hidden">
+          <div class="panel-title"><span>&gt; final progress report</span><span>day 7 breach</span></div>
+          <div class="metric-grid">
+            <div class="metric"><b id="mDays">0</b><span>days logged</span></div>
+            <div class="metric"><b id="mWords">0</b><span>words written</span></div>
+            <div class="metric"><b id="mStreak">0</b><span>longest streak</span></div>
+          </div>
+          <div class="report-text" id="reportText"></div>
+          <div class="btnrow">
+            <button class="btn primary" id="freedomBtn">Play freedom animation</button>
+            <button class="btn" id="backBtn">Back to tracker</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="freedom-overlay hidden" id="freedomOverlay" role="dialog" aria-modal="true" aria-label="Freedom animation">
+    <div class="shards" id="shards"></div>
+    <div class="freedom-box">
+      <pre id="freedomAscii"></pre>
+      <div class="freedom-word">FREEDOM</div>
+      <button class="btn primary" id="closeFreedom">Return changed</button>
+    </div>
+  </div>
+
+  <script>
+    const LS_KEY = 'break_glass_fear_challenge_v1';
+    const prompts = [
+      'DAY 1 // See it: What does this fear actually protect you from?',
+      'DAY 2 // Touch it: Do one small thing that brings the fear into the room.',
+      'DAY 3 // Name the voice: What did fear say before you acted?',
+      'DAY 4 // Break pattern: Do the opposite of your usual avoidance move.',
+      'DAY 5 // Raise pressure: Make the action slightly more public or real.',
+      'DAY 6 // Integrate: What part of you is stronger than this fear now?',
+      'DAY 7 // Breach: What freedom exists on the other side of the barrier?'
+    ];
+
+    const glass = [
+String.raw`          ___________________________
+         /                           /|
+        /                           / |
+       /___________________________/  |
+       |                           |  |
+       |                           |  |
+       |            FEAR           |  |
+       |                           |  |
+       |                           |  /
+       |___________________________| /`,
+String.raw`          ___________________________
+         /                           /|
+        /                  .        / |
+       /__________________/________/  |
+       |                 /         |  |
+       |                /          |  |
+       |            FEAR           |  |
+       |                           |  |
+       |                           |  /
+       |___________________________| /`,
+String.raw`          ___________________________
+         /            .              /|
+        /           ./\.            / |
+       /___________/___\___________/  |
+       |          /     \          |  |
+       |         /   .   \         |  |
+       |        /   FEAR  \        |  |
+       |             |             |  |
+       |             |             |  /
+       |_____________|_____________| /`,
+String.raw`          ___________________________
+         /       .       /\          /|
+        /      ./\.   __/  \        / |
+       /______/___\__/______\______/  |
+       |     /     \/  .     \     |  |
+       |    /   .   \___      \    |  |
+       |   /   FEAR  ___\      \   |  |
+       |       /\   /           |  |
+       |______/__\_/____________|  /
+       |___________________________| /`,
+String.raw`          ___________________________
+         /   .   /\      /\    .    /|
+        /   /\__/  \____/  \       / |
+       /___/____\__/____\___\_____/  |
+       |  /  .   \/  .   \   \    |  |
+       | /   ___ /\___    \   \   |  |
+       |/___/ FEAR  __\____\   \  |  |
+       |   /\  /\  /        \     |  |
+       |__/__\/__\/__________\____|  /
+       |___________________________| /`,
+String.raw`          _________._____.____._______
+         / .  /\___/  /\ /\  \ .   /|
+        /___ /  \ /__/  V  \__\___/ |
+       /\   V    V  .  /\   V   /\  |
+       | \   \  /\____/  \__/\_/  | |
+       |  \___\/  .  \___/  /\    | |
+       |  /   /  FEAR \  \_/  \   | |
+       | /___/\__/\____\_/\___\   | |
+       |/   V    V      V    V \  | /
+       |_____._____._____.______\_|/`,
+String.raw`        .      *       .        *      .
+          \    |    /  \   |   /    .
+       ----\---|---/----\--|--/------
+            \  |  /      \ | /
+        _____\_|_/________\|/_____
+       /\   SHARDS   OF   FEAR   /\
+      /__\_____._____._____._____/__\
+      \  /     V     V     V     \  /
+       \/   THE BARRIER IS OPEN   \/
+        \_________________________/
+              \   \  |  /   /
+               \___\_|_/___/
+                   FREEDOM`
+    ];
+
+    const freedomFrames = [
+String.raw`_____________________________
+|                           |
+|            FEAR           |
+|___________________________|`,
+String.raw`_____________._______________
+|            /              |
+|       FEAR/               |
+|__________/________________|`,
+String.raw`_______.____/\______.________
+|    /\   /  \   /\        |
+|___/  \_/FEAR\_/  \_______|`,
+String.raw`___.__/\__/\____/\____.___
+\  V  V  V  V  V  V  /
+ \       FEAR        /
+  \____/\____/\_____/`,
+String.raw`.  *   .      \ | /      .   *
+--\---\----\--|--/----/---/--
+   \   \    \ | /    /   /
+    SHARDS BECOME SKY`,
+String.raw`      \  |  /     
+   ____\_|_/____
+  /             \
+ /   FREEDOM     \
+ \               /
+  \_____________/`
+    ];
+
+    let state = loadState();
+    let currentDay = Math.min(Math.max(firstIncompleteDay(), 0), 6);
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      asciiArt: $('asciiArt'), stageLabel: $('stageLabel'), statusChip: $('statusChip'), progressFill: $('progressFill'),
+      progressText: $('progressText'), percentText: $('percentText'), saveState: $('saveState'), setupView: $('setupView'),
+      trackerView: $('trackerView'), reportView: $('reportView'), fearInput: $('fearInput'), startBtn: $('startBtn'), demoBtn: $('demoBtn'),
+      fearLine: $('fearLine'), days: $('days'), entryLabel: $('entryLabel'), dayPrompt: $('dayPrompt'), entryText: $('entryText'),
+      saveBtn: $('saveBtn'), finalBtn: $('finalBtn'), resetBtn: $('resetBtn'), mDays: $('mDays'), mWords: $('mWords'), mStreak: $('mStreak'),
+      reportText: $('reportText'), freedomBtn: $('freedomBtn'), backBtn: $('backBtn'), freedomOverlay: $('freedomOverlay'),
+      freedomAscii: $('freedomAscii'), closeFreedom: $('closeFreedom'), shards: $('shards')
+    };
+
+    function loadState() {
+      try { return JSON.parse(localStorage.getItem(LS_KEY)) || { fear:'', entries: Array(7).fill(''), startedAt: null }; }
+      catch { return { fear:'', entries: Array(7).fill(''), startedAt: null }; }
+    }
+    function saveState() {
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      els.saveState.textContent = 'saved ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+    function completedCount() { return state.entries.filter(e => e && e.trim().length > 0).length; }
+    function firstIncompleteDay() { const i = state.entries.findIndex(e => !e || !e.trim()); return i === -1 ? 6 : i; }
+    function wordCount(text) { return (text.trim().match(/\b[\w'’-]+\b/g) || []).length; }
+    function allWords() { return state.entries.join(' '); }
+    function longestStreak() {
+      let best = 0, run = 0;
+      state.entries.forEach(e => { if (e && e.trim()) { run++; best = Math.max(best, run); } else run = 0; });
+      return best;
+    }
+
+    function render() {
+      const done = completedCount();
+      const pct = Math.round(done / 7 * 100);
+      els.asciiArt.textContent = glass[done];
+      els.asciiArt.classList.toggle('final', done === 7);
+      els.stageLabel.textContent = done === 0 ? 'unbroken' : done === 7 ? 'barrier breached' : 'crack level ' + done;
+      els.statusChip.textContent = state.fear
+        ? `DAY ${Math.min(currentDay + 1, 7)} / ${done === 7 ? 'OPEN' : 'IN PROGRESS'}`
+        : 'DAY 0 / SYSTEM LOCKED';
+      els.progressText.textContent = `${done}/7 CHECKPOINTS`;
+      els.percentText.textContent = `${pct}%`;
+      els.progressFill.style.width = pct + '%';
+      els.progressFill.textContent = done ? '█'.repeat(Math.max(2, done * 3)) + (done === 7 ? ' COMPLETE' : '') : '';
+
+      if (!state.fear) {
+        els.setupView.classList.remove('hidden');
+        els.trackerView.classList.add('hidden');
+        els.reportView.classList.add('hidden');
+        return;
+      }
+      els.setupView.classList.add('hidden');
+      els.trackerView.classList.remove('hidden');
+      els.fearLine.textContent = state.fear;
+      renderDays();
+      renderEntry();
+    }
+
+    function renderDays() {
+      els.days.innerHTML = '';
+      state.entries.forEach((entry, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'daytab' + (entry && entry.trim() ? ' done' : '') + (i === currentDay ? ' active' : '');
+        btn.innerHTML = `<strong>${i+1}</strong><span>${entry && entry.trim() ? '[DONE]' : '[OPEN]'}</span>`;
+        btn.addEventListener('click', () => { currentDay = i; render(); });
+        els.days.appendChild(btn);
+      });
+    }
+
+    function renderEntry() {
+      els.entryLabel.textContent = `Day ${currentDay + 1} field report`;
+      els.dayPrompt.textContent = prompts[currentDay];
+      els.entryText.value = state.entries[currentDay] || '';
+      els.finalBtn.disabled = completedCount() === 0;
+      els.finalBtn.textContent = completedCount() === 7 ? 'Generate final report' : 'Preview report';
+    }
+
+    function generateReport() {
+      const done = completedCount();
+      const words = state.entries.reduce((sum, e) => sum + wordCount(e || ''), 0);
+      const fear = state.fear || 'your fear';
+      const text = allWords().toLowerCase();
+      const actionHits = ['did', 'posted', 'asked', 'called', 'went', 'made', 'shared', 'started', 'finished', 'tried'].filter(w => text.includes(w));
+      const feelingHits = ['scared', 'anxious', 'afraid', 'nervous', 'shame', 'excited', 'alive', 'free'].filter(w => text.includes(w));
+      const completionLine = done === 7
+        ? 'You completed the seven-day breach. The point was not to delete fear. The point was to prove movement is available while fear is present.'
+        : `You have ${done} checkpoint${done === 1 ? '' : 's'} logged. This is a live report, not the ending yet. Keep returning until the glass fully breaks.`;
+      els.mDays.textContent = done;
+      els.mWords.textContent = words;
+      els.mStreak.textContent = longestStreak();
+      els.reportText.innerHTML = `
+        <p><b>Target fear:</b> ${escapeHtml(fear)}</p>
+        <p>${completionLine}</p>
+        <p><b>Pattern detected:</b> ${actionHits.length ? 'Your entries contain action language: ' + actionHits.join(', ') + '.' : 'You are still describing the barrier more than the action. Next checkpoint: write the exact move you made.'}</p>
+        <p><b>Emotional signal:</b> ${feelingHits.length ? 'You named real body/emotion signals: ' + feelingHits.join(', ') + '. That means you are watching the fear instead of being fully owned by it.' : 'Name the body sensation more directly next time. Fear gets smaller when it becomes specific.'}</p>
+        <p><b>Freedom note:</b> The win is not becoming fearless. The win is building evidence that fear can ride in the passenger seat while you keep your hands on the wheel.</p>`;
+      els.trackerView.classList.add('hidden');
+      els.reportView.classList.remove('hidden');
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+    }
+
+    function playFreedom() {
+      els.freedomOverlay.classList.remove('hidden');
+      spawnShards();
+      let frame = 0;
+      els.freedomAscii.textContent = freedomFrames[0];
+      const timer = setInterval(() => {
+        frame++;
+        els.freedomAscii.textContent = freedomFrames[Math.min(frame, freedomFrames.length - 1)];
+        if (frame >= freedomFrames.length - 1) clearInterval(timer);
+      }, 270);
+    }
+
+    function spawnShards() {
+      els.shards.innerHTML = '';
+      const chars = ['/', '\\', '|', '_', '*', '+', 'X', '<', '>'];
+      for (let i = 0; i < 90; i++) {
+        const s = document.createElement('span');
+        s.className = 'shard';
+        s.textContent = chars[i % chars.length];
+        s.style.left = (45 + Math.random() * 10) + '%';
+        s.style.top = (44 + Math.random() * 12) + '%';
+        s.style.setProperty('--tx', (Math.random() * 1200 - 600) + 'px');
+        s.style.setProperty('--ty', (Math.random() * 900 - 450) + 'px');
+        s.style.setProperty('--rot', (Math.random() * 980 - 490) + 'deg');
+        s.style.animationDelay = (Math.random() * 180) + 'ms';
+        els.shards.appendChild(s);
+      }
+    }
+
+    els.startBtn.addEventListener('click', () => {
+      const fear = els.fearInput.value.trim();
+      if (!fear) { els.fearInput.focus(); els.fearInput.placeholder = 'Name the fear first.'; return; }
+      state = { fear, entries: Array(7).fill(''), startedAt: new Date().toISOString() };
+      currentDay = 0;
+      saveState(); render();
+    });
+    els.demoBtn.addEventListener('click', () => {
+      state = { fear: 'being seen before I feel ready', startedAt: new Date().toISOString(), entries: [
+        'I posted the first story even though my chest got tight. Fear said people would cringe. I did it anyway.',
+        'I told one friend about the challenge. I felt awkward and alive at the same time.', '', '', '', '', ''
+      ]};
+      currentDay = 2; saveState(); render();
+    });
+    els.saveBtn.addEventListener('click', () => {
+      state.entries[currentDay] = els.entryText.value.trim();
+      if (state.entries[currentDay] && currentDay < 6) currentDay = Math.min(firstIncompleteDay(), currentDay + 1);
+      saveState(); render();
+    });
+    els.finalBtn.addEventListener('click', generateReport);
+    els.backBtn.addEventListener('click', () => { els.reportView.classList.add('hidden'); els.trackerView.classList.remove('hidden'); });
+    els.freedomBtn.addEventListener('click', playFreedom);
+    els.closeFreedom.addEventListener('click', () => els.freedomOverlay.classList.add('hidden'));
+    els.resetBtn.addEventListener('click', () => {
+      if (!confirm('Reset this 7 day challenge on this browser?')) return;
+      localStorage.removeItem(LS_KEY);
+      state = { fear:'', entries:Array(7).fill(''), startedAt:null };
+      currentDay = 0; render();
+    });
+    els.entryText.addEventListener('input', () => { state.entries[currentDay] = els.entryText.value; saveState(); renderDays(); });
+
+    render();
+  </script>
+</body>
+</html>
