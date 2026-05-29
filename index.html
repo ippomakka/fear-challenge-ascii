@@ -187,10 +187,12 @@
     .auth-panel { border: 1px solid #555; background: #050505; padding: 12px; margin-bottom: 16px; display: grid; gap: 10px; }
     .auth-line { color: var(--muted); font-size: 12px; line-height: 1.45; }
     .auth-line b { color: var(--fg); }
-    .auth-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .auth-form { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .auth-form input { min-height: 46px; }
     .auth-form .btn { min-height: 46px; }
-    @media (max-width: 520px) { .auth-form { grid-template-columns: 1fr; } }
+    .auth-gate { display: grid; gap: 14px; }
+    .auth-gate h3 { margin: 0; font-size: clamp(24px, 4vw, 44px); line-height: .9; text-transform: uppercase; letter-spacing: -.06em; }
+    .auth-gate h3 b { color: var(--red); }
 
     .progress-wrap { margin-top: 14px; }
     .progress-meta { display:flex; justify-content:space-between; color:var(--muted); font-size:12px; margin-bottom:8px; }
@@ -285,16 +287,22 @@
       <div class="panel">
         <div class="panel-title"><span>&gt; challenge console</span><span id="saveState">local save</span></div>
 
-        <section class="auth-panel" aria-label="Account sync">
-          <div class="auth-line" id="authStatus">&gt; guest mode // saved on this device</div>
+        <section class="auth-panel auth-gate" id="authView" aria-label="Account sign in">
+          <h3>Sign in to <b>begin.</b></h3>
+          <div class="auth-line" id="authStatus">&gt; account required // register or sign in</div>
           <div class="auth-form" id="authForm">
-            <input id="emailInput" type="email" autocomplete="email" placeholder="email for magic link" />
-            <button class="btn primary" id="magicLinkBtn">Send magic link</button>
+            <input id="emailInput" type="email" autocomplete="email" placeholder="email" />
+            <input id="passwordInput" type="password" autocomplete="current-password" minlength="6" placeholder="password // 6+ characters" />
+            <div class="btnrow">
+              <button class="btn primary" id="signInBtn">Sign in</button>
+              <button class="btn" id="registerBtn">Register</button>
+            </div>
           </div>
           <div class="btnrow hidden" id="signedInActions">
             <button class="btn" id="syncNowBtn">Sync now</button>
             <button class="btn ghost" id="signOutBtn">Sign out</button>
           </div>
+          <div class="auth-line">&gt; Your challenge is saved privately to your account.</div>
         </section>
 
         <section id="setupView" class="setup">
@@ -318,7 +326,7 @@
             <button class="btn" id="finalBtn">Generate report</button>
             <button class="btn ghost" id="resetBtn">Reset</button>
           </div>
-          <p class="footer-note">Guest mode saves on this device. Sign in with magic link to sync across devices.</p>
+          <p class="footer-note">Signed in account mode. Your entries sync across devices.</p>
         </section>
 
         <section id="reportView" class="report hidden">
@@ -481,8 +489,8 @@ String.raw`      \  |  /
       saveBtn: $('saveBtn'), finalBtn: $('finalBtn'), resetBtn: $('resetBtn'), mDays: $('mDays'), mWords: $('mWords'), mStreak: $('mStreak'),
       reportText: $('reportText'), freedomBtn: $('freedomBtn'), backBtn: $('backBtn'), freedomOverlay: $('freedomOverlay'),
       freedomAscii: $('freedomAscii'), closeFreedom: $('closeFreedom'), shards: $('shards'),
-      authStatus: $('authStatus'), authForm: $('authForm'), emailInput: $('emailInput'), magicLinkBtn: $('magicLinkBtn'),
-      signedInActions: $('signedInActions'), syncNowBtn: $('syncNowBtn'), signOutBtn: $('signOutBtn')
+      authView: $('authView'), authStatus: $('authStatus'), authForm: $('authForm'), emailInput: $('emailInput'), passwordInput: $('passwordInput'),
+      signInBtn: $('signInBtn'), registerBtn: $('registerBtn'), signedInActions: $('signedInActions'), syncNowBtn: $('syncNowBtn'), signOutBtn: $('signOutBtn')
     };
 
     function emptyState() { return { fear:'', entries: Array(7).fill(''), startedAt: null, challengeId: null }; }
@@ -495,7 +503,7 @@ String.raw`      \  |  /
     }
     function saveLocalOnly() {
       localStorage.setItem(LS_KEY, JSON.stringify(state));
-      els.saveState.textContent = (authUser ? 'local + cloud' : 'local save') + ' ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      els.saveState.textContent = (authUser ? 'cloud sync' : 'account required') + ' ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     }
     async function saveState() {
       saveLocalOnly();
@@ -518,17 +526,17 @@ String.raw`      \  |  /
 
     function renderAuth() {
       if (!supabaseClient) {
-        setAuthStatus('Supabase failed to load // guest mode only', true);
+        setAuthStatus('Supabase failed to load // refresh and try again', true);
         return;
       }
       if (authUser) {
         els.authForm.classList.add('hidden');
         els.signedInActions.classList.remove('hidden');
-        setAuthStatus(`${authUser.email || 'signed in'} // ${cloudSyncOk ? 'cloud sync active' : 'cloud setup pending'}`);
+        setAuthStatus(`${authUser.email || 'signed in'} // ${cloudSyncOk ? 'cloud sync active' : 'signed in'}`);
       } else {
         els.authForm.classList.remove('hidden');
         els.signedInActions.classList.add('hidden');
-        setAuthStatus('guest mode // saved on this device // add email to sync');
+        setAuthStatus('account required // sign in or register to start');
       }
     }
 
@@ -545,18 +553,43 @@ String.raw`      \  |  /
       });
     }
 
-    async function sendMagicLink() {
+    function getCredentials() {
       const email = els.emailInput.value.trim();
-      if (!email) { els.emailInput.focus(); return; }
-      els.magicLinkBtn.disabled = true;
-      setAuthStatus('sending magic link...');
-      const { error } = await supabaseClient.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin + window.location.pathname }
-      });
-      els.magicLinkBtn.disabled = false;
-      if (error) setAuthStatus('magic link failed // ' + error.message, true);
-      else setAuthStatus('magic link sent // check your email');
+      const password = els.passwordInput.value;
+      if (!email) { els.emailInput.focus(); throw new Error('enter your email'); }
+      if (!password || password.length < 6) { els.passwordInput.focus(); throw new Error('password must be at least 6 characters'); }
+      return { email, password };
+    }
+
+    async function signInWithPassword() {
+      try {
+        const { email, password } = getCredentials();
+        els.signInBtn.disabled = true; els.registerBtn.disabled = true;
+        setAuthStatus('signing in...');
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        setAuthStatus('signed in // loading challenge');
+      } catch (error) {
+        setAuthStatus('sign in failed // ' + error.message, true);
+      } finally {
+        els.signInBtn.disabled = false; els.registerBtn.disabled = false;
+      }
+    }
+
+    async function registerWithPassword() {
+      try {
+        const { email, password } = getCredentials();
+        els.signInBtn.disabled = true; els.registerBtn.disabled = true;
+        setAuthStatus('creating account...');
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) throw error;
+        if (!data.session) setAuthStatus('account created // check email if confirmation is required');
+        else setAuthStatus('account created // loading challenge');
+      } catch (error) {
+        setAuthStatus('registration failed // ' + error.message, true);
+      } finally {
+        els.signInBtn.disabled = false; els.registerBtn.disabled = false;
+      }
     }
 
     async function signOut() {
@@ -670,6 +703,15 @@ String.raw`      \  |  /
       els.percentText.textContent = `${pct}%`;
       els.progressFill.style.width = pct + '%';
       els.progressFill.textContent = done ? '█'.repeat(Math.max(2, done * 3)) + (done === 7 ? ' COMPLETE' : '') : '';
+
+      if (!authUser) {
+        els.authView.classList.remove('hidden');
+        els.setupView.classList.add('hidden');
+        els.trackerView.classList.add('hidden');
+        els.reportView.classList.add('hidden');
+        return;
+      }
+      els.authView.classList.add('hidden');
 
       if (!state.fear) {
         els.setupView.classList.remove('hidden');
@@ -791,7 +833,9 @@ String.raw`      \  |  /
     });
     els.entryText.addEventListener('input', () => { state.entries[currentDay] = els.entryText.value; saveLocalOnly(); renderDays(); });
     els.entryText.addEventListener('blur', () => saveState());
-    els.magicLinkBtn.addEventListener('click', sendMagicLink);
+    els.signInBtn.addEventListener('click', signInWithPassword);
+    els.registerBtn.addEventListener('click', registerWithPassword);
+    els.passwordInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') signInWithPassword(); });
     els.signOutBtn.addEventListener('click', signOut);
     els.syncNowBtn.addEventListener('click', syncStateNow);
 

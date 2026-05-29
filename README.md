@@ -14,8 +14,8 @@ Open: http://127.0.0.1:8788/index.html
 ## What it does
 
 - User enters their main fear.
-- Seven daily check-ins save in browser localStorage for guest mode.
-- Supabase magic-link sign-in can sync challenge/check-in data across devices.
+- Seven daily check-ins save in Supabase for signed-in users.
+- Supabase email/password accounts sync challenge/check-in data across devices.
 - ASCII glass barrier cracks more each completed day.
 - Final report calculates days logged, words written, longest streak, action/emotion signals.
 - Freedom animation plays at the end with flying ASCII shards.
@@ -35,7 +35,7 @@ Run `supabase/schema.sql` once in the Supabase SQL Editor. It creates:
 - `reports`
 - RLS policies so users can only read/write their own rows
 
-In Supabase Auth settings, add this Cloudflare URL to allowed redirect URLs:
+In Supabase Auth settings, email/password signup is enabled and email autoconfirm is turned on so users can register and start immediately. The Cloudflare URL is configured as the site/redirect URL:
 
 ```txt
 https://fear-challenge-ascii.pages.dev
